@@ -4,10 +4,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Optional: pin Dioxus CLI to match your project.
-# Example:
-#   docker build --build-arg DIOXUS_CLI_VERSION=0.6.3 -t dioxus-web-dev .
-ARG DIOXUS_CLI_VERSION=""
+ARG RUST_TOOLCHAIN="1.96"
+ARG DIOXUS_CLI_VERSION="0.7"
 
 # Install Rust globally into /opt/rust.
 # Do NOT set CARGO_HOME globally at runtime; users should get their own writable
@@ -55,21 +53,15 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rustup-ini
          -y \
          --no-modify-path \
          --profile default \
-         --default-toolchain stable \
+         --default-toolchain "${RUST_TOOLCHAIN}" \
     && rm /tmp/rustup-init.sh
 
 RUN CARGO_HOME=/opt/rust/cargo \
     RUSTUP_HOME=/opt/rust/rustup \
-    rustup target add wasm32-unknown-unknown \
-    && if [[ -n "${DIOXUS_CLI_VERSION}" ]]; then \
-         CARGO_HOME=/opt/rust/cargo \
-         RUSTUP_HOME=/opt/rust/rustup \
-         cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked; \
-       else \
-         CARGO_HOME=/opt/rust/cargo \
-         RUSTUP_HOME=/opt/rust/rustup \
-         cargo install dioxus-cli --locked; \
-       fi \
+    rustup target add wasm32-unknown-unknown --toolchain "${RUST_TOOLCHAIN}" \
+    && CARGO_HOME=/opt/rust/cargo \
+       RUSTUP_HOME=/opt/rust/rustup \
+       cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked; \
     && chmod -R a+rX /opt/rust \
     && rustc --version \
     && cargo --version \
