@@ -61,7 +61,7 @@ RUN CARGO_HOME=/opt/rust/cargo \
     rustup target add wasm32-unknown-unknown --toolchain "${RUST_TOOLCHAIN}" \
     && CARGO_HOME=/opt/rust/cargo \
        RUSTUP_HOME=/opt/rust/rustup \
-       cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked; \
+       cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked \
     && chmod -R a+rX /opt/rust \
     && rustc --version \
     && cargo --version \
