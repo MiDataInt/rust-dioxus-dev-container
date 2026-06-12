@@ -4,15 +4,16 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Optional: pin Dioxus CLI to match your app's Dioxus version.
+# Optional: pin Dioxus CLI to match your project.
 # Example:
 #   docker build --build-arg DIOXUS_CLI_VERSION=0.6.3 -t dioxus-web-dev .
 ARG DIOXUS_CLI_VERSION=""
 
-# Create a non-root user so mounted project files are not owned by root.
-ARG USERNAME=dioxus
-ARG USER_UID=1000
-ARG USER_GID=1000
+# Install Rust globally into /opt/rust.
+# Do NOT set CARGO_HOME globally at runtime; users should get their own writable
+# cargo cache under $HOME/.cargo or another location they set.
+ENV RUSTUP_HOME=/opt/rust/rustup
+ENV PATH=/opt/rust/cargo/bin:${PATH}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -22,7 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     file \
     unzip \
     xz-utils \
-    sudo \
     \
     build-essential \
     make \
@@ -40,35 +40,43 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     zlib1g-dev \
     libsqlite3-dev \
+    libpq-dev \
     \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
-    && useradd --uid "${USER_UID}" --gid "${USER_GID}" -m "${USERNAME}" \
-    && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}" \
-    && chmod 0440 "/etc/sudoers.d/${USERNAME}"
+RUN mkdir -p /opt/rust/cargo /opt/rust/rustup /workspace \
+    && chmod -R a+rX /opt/rust \
+    && chmod 1777 /workspace
 
-USER ${USERNAME}
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rustup-init.sh \
+    && CARGO_HOME=/opt/rust/cargo \
+       RUSTUP_HOME=/opt/rust/rustup \
+       sh /tmp/rustup-init.sh \
+         -y \
+         --no-modify-path \
+         --profile default \
+         --default-toolchain stable \
+    && rm /tmp/rustup-init.sh
 
-ENV RUSTUP_HOME=/home/${USERNAME}/.rustup
-ENV CARGO_HOME=/home/${USERNAME}/.cargo
-ENV PATH=/home/${USERNAME}/.cargo/bin:${PATH}
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --profile default --default-toolchain stable \
-    && rustup target add wasm32-unknown-unknown \
+RUN CARGO_HOME=/opt/rust/cargo \
+    RUSTUP_HOME=/opt/rust/rustup \
+    rustup target add wasm32-unknown-unknown \
     && if [[ -n "${DIOXUS_CLI_VERSION}" ]]; then \
+         CARGO_HOME=/opt/rust/cargo \
+         RUSTUP_HOME=/opt/rust/rustup \
          cargo install dioxus-cli --version "${DIOXUS_CLI_VERSION}" --locked; \
        else \
+         CARGO_HOME=/opt/rust/cargo \
+         RUSTUP_HOME=/opt/rust/rustup \
          cargo install dioxus-cli --locked; \
        fi \
+    && chmod -R a+rX /opt/rust \
     && rustc --version \
     && cargo --version \
     && dx --version
 
 WORKDIR /workspace
 
-# Common Dioxus dev server ports.
 EXPOSE 8080
 EXPOSE 3000
 
